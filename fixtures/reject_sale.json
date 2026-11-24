@@ -1,0 +1,3 @@
+[
+  {"id":"reject-same-count","type":"seal-lot","at":"2026-11-24T10:00:00Z","lot":"LOT-17","expected":null,"scans":["out-1","in-3"],"loads":["DECK-1","DECK-2"]}
+]

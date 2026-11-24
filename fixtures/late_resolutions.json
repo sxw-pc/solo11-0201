@@ -1,0 +1,4 @@
+[
+  {"id": "exclude-stage-echo", "type": "review-scan", "at": "2026-11-24T09:45:00Z", "scan": "late-stage-echo", "expected": null, "outcome": "exclude", "operator": "Ira", "reason": "Reader cached an earlier loop; independent walk shows no arrival"},
+  {"id": "retain-deck-print", "type": "choose-ticket", "at": "2026-11-24T09:46:00Z", "load": "DECK-1", "ticket": "ticket-1-retare", "considered": ["late-deck-print"], "expected": "choose-1-retare", "reason": "Late print includes the loose divider; retain the accepted bare-deck print"}
+]

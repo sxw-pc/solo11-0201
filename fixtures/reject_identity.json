@@ -1,0 +1,3 @@
+[
+  {"id":"reject-mark","type":"review-scan","at":"2026-11-24T10:00:00Z","scan":"out-2","expected":"r-out-2","outcome":"confirm","mark":"CHALK-1","operator":"Ira","reason":"Mismatching handheld mark"}
+]

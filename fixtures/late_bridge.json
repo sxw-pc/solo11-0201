@@ -1,0 +1,4 @@
+[
+  {"id": "late-stage-echo", "type": "gate-scan", "at": "2026-11-24T09:26:00Z", "reader": "Auction intake replay", "tag": "RF-101", "from": "OUT", "to": "P-STAGE"},
+  {"id": "late-deck-print", "type": "scale-ticket", "at": "2026-11-24T09:24:00Z", "load": "DECK-1", "receipt": "B2-809", "gross_g": 474000, "tare_g": 68000}
+]
