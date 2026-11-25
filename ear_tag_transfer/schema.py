@@ -30,7 +30,32 @@ CREATE TABLE pen_contract (
 );
 CREATE TABLE gate_scan (
     id TEXT PRIMARY KEY, at TEXT NOT NULL, tag TEXT NOT NULL, reader TEXT NOT NULL,
-    origin TEXT NOT NULL, destination TEXT NOT NULL
+    origin TEXT NOT NULL, destination TEXT NOT NULL,
+    session TEXT, seq INTEGER
+);
+CREATE TABLE reader_session (
+    reader TEXT NOT NULL, session TEXT NOT NULL, opened_at TEXT NOT NULL, event TEXT NOT NULL,
+    PRIMARY KEY(reader, session)
+);
+CREATE TABLE reader_lane (
+    event TEXT PRIMARY KEY, reader TEXT NOT NULL, session TEXT NOT NULL,
+    origin TEXT NOT NULL, destination TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL
+);
+CREATE TABLE reader_clock_head (
+    event TEXT PRIMARY KEY, reader TEXT NOT NULL, session TEXT NOT NULL,
+    seq INTEGER NOT NULL, earliest_at TEXT NOT NULL, latest_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX one_clock_head ON reader_clock_head(reader, session, seq);
+CREATE TABLE coverage_authorization (
+    event TEXT PRIMARY KEY, pen TEXT NOT NULL REFERENCES pen(id),
+    origin TEXT NOT NULL, destination TEXT NOT NULL,
+    source_reader TEXT NOT NULL, backup_reader TEXT NOT NULL
+);
+CREATE TABLE clearance_evidence (
+    clear_event TEXT NOT NULL, reader TEXT NOT NULL, session TEXT NOT NULL,
+    origin TEXT NOT NULL, destination TEXT NOT NULL,
+    covered_seqs TEXT NOT NULL, basis TEXT NOT NULL,
+    PRIMARY KEY(clear_event, reader, session, origin, destination)
 );
 CREATE TABLE gate_review (
     id TEXT PRIMARY KEY, scan TEXT NOT NULL REFERENCES gate_scan(id), at TEXT NOT NULL,

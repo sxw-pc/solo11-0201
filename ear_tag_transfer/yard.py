@@ -1,7 +1,8 @@
 """Pen tenancy, directional gate use, and physical clearance."""
 
+from . import coverage
 from .identity import animal, latest_review
-from .rules import expected, known, one, require, text
+from .rules import expected, integer, known, one, require, text
 
 OUT = "OUT"
 
@@ -55,7 +56,24 @@ def capture(db, event):
     for endpoint in (origin, destination):
         if endpoint != OUT:
             require(event["at"] >= pen(db, endpoint)["opened_at"], "scan_before_pen_open", endpoint)
-    db.execute("INSERT INTO gate_scan VALUES (?,?,?,?,?,?)", (event["id"], event["at"], tag, reader, origin, destination))
+    session_id = event.get("session")
+    seq = event.get("seq")
+    require((session_id is None) == (seq is None), "session_fields", "session and seq must appear together")
+    if session_id is None:
+        # Legacy shifts without device coverage evidence keep their original protocol.
+        db.execute("INSERT INTO gate_scan VALUES (?,?,?,?,?,?,?,?)",
+                   (event["id"], event["at"], tag, reader, origin, destination, None, None))
+        return
+    session_id = text(event, "session")
+    seq = integer(event, "seq", 0)
+    require(one(db, "SELECT 1 FROM reader_session WHERE reader = ? AND session = ?", (reader, session_id)),
+            "unknown_reader_session", f"{reader} / {session_id}")
+    require(not one(db, "SELECT 1 FROM gate_scan WHERE reader = ? AND session = ? AND seq = ?",
+                    (reader, session_id, seq)), "duplicate_session_sequence", f"{session_id} / {seq}")
+    lane = coverage.validate_session_scan(db, reader, session_id, seq, event["at"])
+    require(lane["origin"] == origin and lane["destination"] == destination, "scan_lane_mismatch", event["id"])
+    db.execute("INSERT INTO gate_scan VALUES (?,?,?,?,?,?,?,?)",
+               (event["id"], event["at"], tag, reader, origin, destination, session_id, seq))
 
 
 def proof(db, scan_id, animal_id, origin, destination, owner, at):
@@ -144,9 +162,21 @@ def clear(db, event):
     blockers = unresolved(db, target, event["at"])
     require(not blockers, "unresolved_gate_scans", ", ".join(blockers))
     require(not movement_disputes(db, pen_id), "disputed_pen_movement", pen_id)
+    # Device coverage: a gap that could still hide a crossing of this pen at or
+    # before the signed second blocks clearance. Conflicting evidence is fatal.
+    conclusion = coverage.pen_coverage(db, target, event["at"])
+    require(not conclusion["evidence_conflicts"], "device_evidence_conflict",
+            ", ".join(f"{row['reader']}/{row['session']}" for row in conclusion["evidence_conflicts"]))
+    require(not conclusion["blocking_gaps"], "unverified_device_gap",
+            ", ".join(f"{row['reader']}/{row['session']}#{row['seq']}" for row in conclusion["blocking_gaps"]))
     db.execute("UPDATE pen SET cleared_at = ?, clear_event = ? WHERE id = ?", (event["at"], event["id"], pen_id))
+    # Freeze the coverage basis actually used; later uploads never rewrite it.
+    coverage.freeze_evidence(db, event["id"], target, event["at"], conclusion)
 
 
 COMMANDS = {"open-pen": open_pen, "pen-contract": contract_pen, "gate-scan": capture,
-            "move": move, "drain-pen": drain, "clear-pen": clear}
+            "move": move, "drain-pen": drain, "clear-pen": clear,
+            "reader-session": coverage.open_session, "reader-lane": coverage.register_lane,
+            "reader-clock-head": coverage.register_clock_head,
+            "coverage-authorization": coverage.authorize}
 

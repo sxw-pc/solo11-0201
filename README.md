@@ -37,10 +37,14 @@ python -B -m ear_tag_transfer replay --db shift.sqlite --repair
 | 身份 | `review-scan` | `scan`, `expected`, `outcome`, `operator`, `reason`。`confirm` 另填 `mark`，`exclude` 表示排除该扫。 |
 | 围栏 | `open-pen` | `pen`, `keeper` |
 | 围栏 | `pen-contract` | `pen`, `keeper`, `owner`, `action` (`grant` / `revoke`), `expected` |
-| 围栏 | `gate-scan` | `from`, `to`, `tag`, `reader` |
+| 围栏 | `gate-scan` | `from`, `to`, `tag`, `reader`；带设备覆盖时另填 `session`, `seq` |
 | 围栏 | `move` | `animal`, `scan`, `from`, `to`, `owner` |
 | 围栏 | `drain-pen` | `pen`, `keeper` |
 | 围栏 | `clear-pen` | `pen`, `keeper`, `walked_by` |
+| 围栏 | `reader-session` | `reader`, `session`（读头连续会话开场，原始凭据） |
+| 围栏 | `reader-lane` | `reader`, `session`, `from`, `to`, `starts_at`, `ends_at`（左闭右开栏道时段，原始凭据） |
+| 围栏 | `reader-clock-head` | `reader`, `session`, `seq`, `earliest_at`, `latest_at`（缺序可信时钟头，原始凭据） |
+| 围栏 | `coverage-authorization` | `pen`, `from`, `to`, `source_reader`, `backup_reader`（授权独立读头冗余采证） |
 | 秤台 | `open-load` | `load`, `deck`, `animals`（逐头编号数组） |
 | 秤台 | `scale-ticket` | `load`, `receipt`, `gross_g`, `tare_g`（整数克） |
 | 秤台 | `choose-ticket` | `load`, `ticket`, `considered`（全部待裁票号数组）, `expected`, `reason` |
@@ -53,6 +57,9 @@ python -B -m ear_tag_transfer replay --db shift.sqlite --repair
 
 - RFID 原始读数以设备发生时刻查耳标历史有效区间。已发耳标不再转配。手持确认必须给出有效可见记号，已知耳标和手持记号必须指向同一个体。原始扫描保留，排除和重认追加独立复核版。
 - 代养方按买家签收约定。普通移栏按当前所有权检查目标栏接收约定，使用复核过的同一只、同方向门扫，从当前栏位移出并一次性销号。封栏只准出。清场还需另一人走查、零在栏、已对清截至签证时的既有门扫，以及无争议的已记移栏；清场后收到的异常显示在实时状态。
+- 设备覆盖证据可选。带 `session`/`seq` 的门扫按某台读头的连续会话编号，序号单调且相邻序号至少隔一秒，并必须落在登记的左闭右开栏道时段内，段外没有采录。以可信确认的首尾序号圈出缺口；设备另存的时钟头给出该缺序在本会话内可能存在的秒区间。每个缺口的所有可行安置必须同时满足序号次序、相邻已知发生时刻、时钟头和栏道时段，且两个缺序不能复用同一发生秒；不存在任何可行安置时报 `device_evidence_conflict`。
+- 缺口在任一可行安置中落在本栏任一门道、且发生于拟签截至秒及以前，即为本栏缺证（`unverified_device_gap`），阻断清场；发生于封存以后或在所有可行安置里都属于无关栏道的缺口不阻断。没有设备证据的旧班仍走原门扫采录协议，清场判断不变。
+- 源机规程下，按源机连续性的签证只能使用该机完整无缺的对应区间。授权冗余采证（`coverage-authorization`）后，允许第二台独立读头覆盖源机所有仍可能缺失的同向秒位；第二台必须在场同道、其原件范围自身无不明缺口，补证仍须通过既有的空栏与门扫复核。签证冻结当时所用读头、会话、栏道和被覆盖序号，后续补传不改写旧签证。`report` 的 `gate_coverage` 与 `clear-pen` 使用同一结论。
 - 同桥打印号只认一次。待裁票须全列，秤员可保留原票或采用本轮待裁中的一张票。即使有旧选票，迟到的未裁票也会暂停秤盘可用性。
 - 成交台逐头预占同一卖方有权且当班未售的牲畜，关联买家在目标栏的接收约定。`report` 中待交割批的 `allocations` 给出每头当前来源、目标和阻断原因，`release` 给出封账是否还可执行。撤销释放未交割预占。
 - 封账逐头匹配预约、门扫、目标栏及秤盘成员。各秤盘互不重叠且只含同一目标栏的动物。所选票须发生于该动物当前入栏执行至目标门扫之间。封账保存复核、当前栏位、代养约定及所选票的版本和分栏重量。交割重新核验所有证据，事务内同时转移产权、记目标栏和代养方、消耗门扫并清理预占。

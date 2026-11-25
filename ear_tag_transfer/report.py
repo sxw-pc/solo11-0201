@@ -2,7 +2,7 @@
 
 import json
 
-from . import identity, sale, weighing, yard
+from . import coverage, identity, sale, weighing, yard
 from .ledger import business_clock, check_version, transaction
 
 
@@ -10,8 +10,10 @@ def pen_report(db, target):
     pending = yard.unresolved(db, target)
     disputes = yard.movement_disputes(db, target["id"])
     occupants = yard.occupants(db, target["id"])
+    coverage_conclusion = coverage.pen_coverage(db, target, business_clock(db) or None)
+    coverage_issues = (coverage_conclusion["blocking_gaps"] + coverage_conclusion["evidence_conflicts"])
     if target["clear_event"]:
-        state = "clear_disputed" if pending or disputes or occupants else "cleared"
+        state = "clear_disputed" if pending or disputes or occupants or coverage_issues else "cleared"
     elif target["drain_at"]:
         state = "draining"
     else:
@@ -20,7 +22,8 @@ def pen_report(db, target):
                               AND NOT EXISTS (SELECT 1 FROM pen_contract n WHERE n.prior = c.event) ORDER BY c.owner""",
                            (target["id"],))
     return {**dict(target), "state": state, "occupants": occupants, "unreconciled_scans": pending,
-            "disputed_moves": [row["scan"] for row in disputes], "contracts": [dict(row) for row in contracts]}
+            "disputed_moves": [row["scan"] for row in disputes], "contracts": [dict(row) for row in contracts],
+            "gate_coverage": coverage_conclusion}
 
 
 def lot_report(db, contract, clock):

@@ -12,7 +12,7 @@ from .schema import DOMAIN, JOURNAL, TABLES
 
 VERSION = 1
 GENESIS = "0" * 64
-RAW = {"gate-scan", "scale-ticket"}
+RAW = {"gate-scan", "scale-ticket", "reader-session", "reader-lane", "reader-clock-head"}
 DESKS = {"identity": identity.COMMANDS, "yard": yard.COMMANDS, "weigh": weighing.COMMANDS, "sale": sale.COMMANDS}
 COMMANDS = {command: handler for desk in DESKS.values() for command, handler in desk.items()}
 
